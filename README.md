@@ -335,7 +335,7 @@ Base URL: `http://localhost:5000/api`
 
 ## License
 
-This project is released for educational and personal use. Add a license of your choice (MIT recommended) before publishing.
+This project is released for educational and personal use.
 
 ---
 
