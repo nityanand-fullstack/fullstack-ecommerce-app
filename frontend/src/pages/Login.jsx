@@ -35,7 +35,7 @@ export default function Login() {
       const res = await login(form);
       toast.success("Logged in successfully");
       const role = res?.data?.user?.role;
-      const dest = fromPath || (role === "admin" ? "/admin" : "/");
+      const dest = role === "admin" ? fromPath || "/admin" : "/";
       navigate(dest, { replace: true });
     } catch (err) {
       const msg = err.response?.data?.message || "Login failed";

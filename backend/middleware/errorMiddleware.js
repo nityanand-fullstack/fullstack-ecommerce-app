@@ -6,6 +6,9 @@ export const notFound = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, next) => {
+  console.error(`[ERROR] ${req.method} ${req.originalUrl}`);
+  console.error(err);
+
   let statusCode = res.statusCode && res.statusCode !== 200 ? res.statusCode : 500;
   let message = err.message || "Internal Server Error";
   let errors;

@@ -11,3 +11,9 @@ export const getOrderApi = (id) =>
 
 export const payOrderApi = (id) =>
   api.put(`/orders/${id}/pay`).then((r) => r.data);
+
+export const initRazorpayApi = () =>
+  api.post("/orders/razorpay/init").then((r) => r.data);
+
+export const verifyRazorpayApi = (payload) =>
+  api.post("/orders/razorpay/verify", payload).then((r) => r.data);

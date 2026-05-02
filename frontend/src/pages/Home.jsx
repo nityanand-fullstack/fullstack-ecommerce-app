@@ -9,11 +9,11 @@ import { listProductsApi } from "../api/productApi.js";
 const formatPrice = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
 const HERO_BG =
-  "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=2000&q=80";
-const SALE_BG =
   "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?auto=format&fit=crop&w=2000&q=80";
+const SALE_BG =
+  "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=2000&q=80";
 const PROMO_BG =
-  "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=2000&q=80";
+  "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=2000&q=80";
 
 const faqs = [
   {
@@ -108,35 +108,55 @@ export default function Home() {
         <span className="font-semibold underline">Use code FIRST10 for 10% off</span>
       </div>
 
-      {/* Welcome strip for logged-in users */}
+      {/* Welcome banner for logged-in users */}
       {isAuthenticated && user?.role !== "admin" && (
-        <div className="bg-gradient-to-r from-brand-50 via-white to-amber-50 border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-lg">👋</span>
-              <span className="text-slate-700">
-                Welcome back,{" "}
-                <span className="font-semibold text-slate-900">
-                  {user?.name?.split(" ")[0]}
-                </span>
-              </span>
+        <div className="relative bg-gradient-to-r from-brand-50 via-white to-amber-50 border-b border-slate-200 overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-brand-200/40 blur-3xl pointer-events-none"
+          />
+          <div
+            aria-hidden
+            className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-amber-200/40 blur-3xl pointer-events-none"
+          />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center gap-5 flex-wrap">
+            {/* Top-left: avatar + greeting */}
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="h-14 w-14 sm:h-16 sm:w-16 grid place-items-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 text-white text-2xl sm:text-3xl font-bold shrink-0 ring-4 ring-white shadow-lg">
+                {(user?.name || "U").charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] sm:text-xs font-semibold text-brand-600 uppercase tracking-[0.2em]">
+                  Welcome back 👋
+                </p>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
+                  {user?.name}
+                </h2>
+                {user?.email && (
+                  <p className="text-xs text-slate-500 truncate mt-0.5 hidden sm:block">
+                    {user.email}
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Right: quick actions */}
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/orders"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white text-slate-700 ring-1 ring-slate-200 hover:ring-brand-300 px-3 py-1.5 text-xs font-semibold transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white text-slate-700 ring-1 ring-slate-200 hover:ring-brand-300 hover:text-brand-700 px-3.5 py-2 text-xs font-semibold transition shadow-sm cursor-pointer"
               >
                 📦 My orders
               </Link>
               <Link
                 to="/cart"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white text-slate-700 ring-1 ring-slate-200 hover:ring-brand-300 px-3 py-1.5 text-xs font-semibold transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white text-slate-700 ring-1 ring-slate-200 hover:ring-brand-300 hover:text-brand-700 px-3.5 py-2 text-xs font-semibold transition shadow-sm cursor-pointer"
               >
                 🛒 My cart
               </Link>
               <Link
                 to="/categories"
-                className="inline-flex items-center gap-1.5 rounded-full bg-brand-500 text-white hover:bg-brand-600 px-3 py-1.5 text-xs font-semibold transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-brand-500 text-white hover:bg-brand-600 px-3.5 py-2 text-xs font-semibold transition shadow-md cursor-pointer"
               >
                 Browse categories →
               </Link>

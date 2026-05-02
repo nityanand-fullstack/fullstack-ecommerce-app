@@ -30,7 +30,7 @@ export const getStats = async (req, res, next) => {
       totalOrders,
       revenueAgg,
       lowStock,
-      pendingOrders,
+      newOrders,
       recentOrders,
     ] = await Promise.all([
       User.countDocuments({}),
@@ -41,7 +41,7 @@ export const getStats = async (req, res, next) => {
         { $group: { _id: null, total: { $sum: "$totalPrice" } } },
       ]),
       Product.countDocuments({ stock: { $lt: 15 } }),
-      Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ status: "processing" }),
       Order.find({})
         .sort({ createdAt: -1 })
         .limit(5)
@@ -56,7 +56,7 @@ export const getStats = async (req, res, next) => {
         orders: totalOrders,
         revenue: revenueAgg[0]?.total || 0,
         lowStock,
-        pendingOrders,
+        newOrders,
       },
       recentOrders,
     };

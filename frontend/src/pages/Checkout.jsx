@@ -3,7 +3,17 @@ import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useCart } from "../context/CartContext.jsx";
-import { placeOrderApi } from "../api/orderApi.js";
+import { initRazorpayApi, verifyRazorpayApi } from "../api/orderApi.js";
+
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 
 const formatPrice = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
@@ -21,7 +31,6 @@ export default function Checkout() {
     postalCode: user?.address?.postalCode || "",
     country: user?.address?.country || "India",
   });
-  const [paymentMethod, setPaymentMethod] = useState("COD");
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,28 +58,81 @@ export default function Checkout() {
       return;
     }
     if (!validate()) return;
+
+    const shippingAddress = {
+      fullName: form.fullName.trim(),
+      phone: form.phone.trim(),
+      street: form.street.trim(),
+      city: form.city.trim(),
+      state: form.state.trim(),
+      postalCode: form.postalCode.trim(),
+      country: form.country.trim(),
+    };
+
     setSubmitting(true);
-    try {
-      const res = await placeOrderApi({
-        shippingAddress: {
-          fullName: form.fullName.trim(),
-          phone: form.phone.trim(),
-          street: form.street.trim(),
-          city: form.city.trim(),
-          state: form.state.trim(),
-          postalCode: form.postalCode.trim(),
-          country: form.country.trim(),
-        },
-        paymentMethod,
-      });
-      toast.success("Order placed successfully");
-      await refresh();
-      navigate(`/orders/${res.data.order._id}/success`, { replace: true });
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Could not place order");
-    } finally {
+
+    const ok = await loadRazorpayScript();
+    if (!ok) {
+      toast.error("Failed to load Razorpay. Check your connection.");
       setSubmitting(false);
+      return;
     }
+
+    let init;
+    try {
+      init = await initRazorpayApi();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not start payment");
+      setSubmitting(false);
+      return;
+    }
+
+    const { razorpayOrderId, amount, currency, key } = init.data;
+
+    const rzp = new window.Razorpay({
+      key,
+      amount,
+      currency,
+      order_id: razorpayOrderId,
+      name: "E-Com App",
+      description: "Test Mode Payment",
+      prefill: {
+        name: user?.name || form.fullName,
+        email: user?.email || "",
+        contact: form.phone,
+      },
+      theme: { color: "#6366f1" },
+      handler: async (response) => {
+        try {
+          const res = await verifyRazorpayApi({
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            shippingAddress,
+          });
+          toast.success("Payment successful");
+          await refresh();
+          navigate(`/orders/${res.data.order._id}/success`, { replace: true });
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Payment verification failed");
+        } finally {
+          setSubmitting(false);
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          setSubmitting(false);
+          toast("Payment cancelled — no order was created", { icon: "ℹ️" });
+        },
+      },
+    });
+
+    rzp.on("payment.failed", (resp) => {
+      setSubmitting(false);
+      toast.error(resp.error?.description || "Payment failed");
+    });
+
+    rzp.open();
   };
 
   if (items.length === 0) {
@@ -160,32 +222,27 @@ export default function Checkout() {
 
           <section className="card p-6">
             <h2 className="font-semibold text-slate-900 text-lg">Payment method</h2>
-            <div className="mt-4 space-y-2">
-              {[
-                { id: "COD", label: "Cash on Delivery", desc: "Pay when your order arrives" },
-                { id: "Card", label: "Credit / Debit Card", desc: "Mock — pay after placing order" },
-                { id: "UPI", label: "UPI", desc: "Mock — pay after placing order" },
-              ].map((opt) => (
-                <label
-                  key={opt.id}
-                  className={`flex items-start gap-3 p-3 rounded-xl ring-1 cursor-pointer transition ${
-                    paymentMethod === opt.id
-                      ? "ring-brand-500 bg-brand-50/40"
-                      : "ring-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <input
-                    type="radio" name="paymentMethod" value={opt.id}
-                    checked={paymentMethod === opt.id}
-                    onChange={() => setPaymentMethod(opt.id)}
-                    className="mt-1 text-brand-500 focus:ring-brand-500"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{opt.label}</p>
-                    <p className="text-xs text-slate-500">{opt.desc}</p>
-                  </div>
-                </label>
-              ))}
+            <div className="mt-4">
+              <div className="flex items-start gap-3 p-4 rounded-xl ring-1 ring-brand-500 bg-brand-50/40">
+                <div className="h-10 w-10 grid place-items-center rounded-lg bg-white ring-1 ring-slate-200 shrink-0">
+                  <svg className="h-5 w-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Razorpay
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 align-middle">
+                      Test Mode
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Card / UPI / Netbanking — no real money. Use test card
+                    <code className="mx-1 px-1 py-0.5 rounded bg-slate-100 text-slate-700">4111 1111 1111 1111</code>
+                    or UPI <code className="mx-1 px-1 py-0.5 rounded bg-slate-100 text-slate-700">success@razorpay</code>.
+                  </p>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -250,7 +307,9 @@ export default function Checkout() {
               disabled={submitting}
               className="btn-primary w-full mt-6 !py-3"
             >
-              {submitting ? "Placing order..." : `Place order · ${formatPrice(total)}`}
+              {submitting
+                ? "Processing payment..."
+                : `Pay ${formatPrice(total)} with Razorpay`}
             </button>
             <Link
               to="/cart"

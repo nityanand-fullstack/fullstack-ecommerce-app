@@ -40,7 +40,7 @@ const orderSchema = new mongoose.Schema(
     shippingAddress: { type: shippingAddressSchema, required: true },
     paymentMethod: {
       type: String,
-      enum: ["COD", "Card", "UPI"],
+      enum: ["COD", "Card", "UPI", "Razorpay"],
       default: "COD",
     },
     itemsPrice: { type: Number, required: true, min: 0 },
@@ -49,6 +49,12 @@ const orderSchema = new mongoose.Schema(
     totalPrice: { type: Number, required: true, min: 0 },
     isPaid: { type: Boolean, default: false },
     paidAt: { type: Date },
+    paymentResult: {
+      razorpayOrderId: { type: String },
+      razorpayPaymentId: { type: String },
+      razorpaySignature: { type: String },
+      status: { type: String },
+    },
     status: {
       type: String,
       enum: ["pending", "processing", "shipped", "delivered", "cancelled"],

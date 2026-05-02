@@ -1,6 +1,6 @@
 # E-Com App
 
-A full-stack e-commerce application built with the MERN stack. It includes a customer-facing storefront (browse products, cart, checkout, orders, reviews) and an admin dashboard (manage products, categories, orders, and users) — with JWT authentication, role-based access control, and Cloudinary image uploads.
+A full-stack e-commerce application built with the MERN stack. It includes a customer-facing storefront (browse products, cart, checkout, orders, reviews) and an admin dashboard (manage products, categories, orders, and users) — with JWT authentication, role-based access control, Cloudinary image uploads, and **Razorpay** payment gateway in test mode.
 
 ---
 
@@ -13,6 +13,7 @@ A full-stack e-commerce application built with the MERN stack. It includes a cus
 - **bcryptjs** for password hashing
 - **Cloudinary** for image storage
 - **Multer** for multipart uploads
+- **Razorpay** SDK (test-mode payments + HMAC-SHA256 signature verification)
 - **CORS**, **dotenv**, **nodemon**
 
 ### Frontend
@@ -21,6 +22,7 @@ A full-stack e-commerce application built with the MERN stack. It includes a cus
 - **Tailwind CSS**
 - **Axios**
 - **React Hot Toast**
+- **Razorpay Checkout** (loaded dynamically on demand)
 - Context API for auth and cart state
 
 ---
@@ -32,15 +34,22 @@ A full-stack e-commerce application built with the MERN stack. It includes a cus
 - Browse products with category filtering
 - Product detail page with reviews and ratings
 - Cart (add, update quantity, remove, clear) — persisted server-side
-- Checkout and order placement
+- Animated cart icon in the navbar with a count badge that "bumps" each time an item is added
+- Checkout with **Razorpay Test Mode** payment (Card / UPI / Netbanking — no real money)
+- Orders are only created **after** a successful payment — cancelling the Razorpay modal leaves nothing in the database
 - "My Orders" history and order detail page
 - Submit reviews (only after purchase — eligibility check)
 
 ### Admin
-- Protected admin dashboard with stats
+- Polished admin dashboard with KPI tiles (revenue, orders, customers, products) and a "New orders to fulfill" tile linking straight to paid-but-not-shipped orders
 - Manage products (create, edit, delete, image upload)
 - Manage categories (create, edit, delete with auto slug)
-- Manage orders (view all, update status, mark paid)
+- Manage orders — redesigned page with:
+  - Summary strip (showing / paid / to-fulfill / revenue)
+  - Search bar with status-filter chips that show counts per status
+  - Customer avatars, payment-method icons, and color-coded status pills
+  - Expandable detail panel with itemized totals, shipping address, and Razorpay payment IDs
+  - Manual refresh button
 - Manage users (list, change role, delete)
 - Single & multiple image upload to Cloudinary
 
@@ -48,6 +57,7 @@ A full-stack e-commerce application built with the MERN stack. It includes a cus
 - JWT auth middleware (`protect`) and role guard (`adminOnly`)
 - Centralized error handler & 404 middleware
 - Seeder script to populate sample data
+- Stats cache (30s TTL) auto-invalidated whenever an order is placed/paid so the admin dashboard stays in sync
 - Environment-based config
 
 ---
@@ -59,7 +69,8 @@ E-com-app/
 ├── backend/
 │   ├── config/
 │   │   ├── cloudinary.js
-│   │   └── db.js
+│   │   ├── db.js
+│   │   └── razorpay.js
 │   ├── controllers/
 │   │   ├── adminController.js
 │   │   ├── authController.js
@@ -130,6 +141,7 @@ E-com-app/
 - **npm** v9+
 - **MongoDB** (local instance or MongoDB Atlas)
 - **Cloudinary** account (for image uploads)
+- **Razorpay** account in **Test Mode** (free — for the payment flow)
 
 ### 1. Clone the repository
 ```bash
@@ -153,7 +165,11 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 CLOUDINARY_FOLDER=ecom-app
+RAZORPAY_KEY_ID=rzp_test_your_key_id
+RAZORPAY_KEY_SECRET=your_key_secret
 ```
+
+> Get test keys from https://dashboard.razorpay.com → **Settings → API Keys → Generate Test Key**.
 
 Seed sample data (optional):
 ```bash
@@ -239,10 +255,12 @@ Base URL: `http://localhost:5000/api`
 ### Orders — `/api/orders` (all routes require auth)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/` | Place order |
+| POST | `/` | Place order (legacy COD flow — kept for backward compat) |
 | GET | `/me` | List my orders |
 | GET | `/:id` | Get order by id |
-| PUT | `/:id/pay` | Mark order as paid |
+| PUT | `/:id/pay` | Mark order as paid (mock) |
+| POST | `/razorpay/init` | Validate cart & create a Razorpay order. **No DB order is created yet.** Returns `{ razorpayOrderId, amount, currency, key }`. |
+| POST | `/razorpay/verify` | Verify HMAC-SHA256 signature, then create the DB order with `isPaid: true`, decrement stock, clear the cart. Body: `{ razorpay_order_id, razorpay_payment_id, razorpay_signature, shippingAddress }` |
 
 ### Admin — `/api/admin` (admin only)
 | Method | Endpoint | Description |
@@ -269,6 +287,38 @@ Base URL: `http://localhost:5000/api`
 - Frontend stores the token and sends it via `Authorization: Bearer <token>` (configured in `src/api/axios.js`).
 - `protect` middleware verifies the token and loads the user.
 - `adminOnly` middleware restricts admin-scoped routes.
+
+---
+
+## Payment Flow (Razorpay — Test Mode)
+
+The checkout uses Razorpay's standard **server-side order + signature verification** flow. The order is **not** persisted to MongoDB until the payment is verified, so closing the modal mid-payment leaves nothing in the database.
+
+```
+1. Frontend  →  POST /api/orders/razorpay/init
+                 (validates cart, creates a Razorpay order via SDK)
+2. Backend   →  Razorpay API
+                 razorpay.orders.create({ amount, currency, receipt })
+3. Frontend  ←  { razorpayOrderId, amount, currency, key }
+4. Frontend     opens Razorpay Checkout modal with those params
+5. User pays    (test card / UPI — no real money)
+6. Razorpay  →  Frontend (handler)
+                 { razorpay_order_id, razorpay_payment_id, razorpay_signature }
+7. Frontend  →  POST /api/orders/razorpay/verify
+                 (sends the 3 fields + shippingAddress)
+8. Backend      verifies HMAC-SHA256(`{order_id}|{payment_id}`, KEY_SECRET)
+                 == razorpay_signature
+9. Backend      creates Order(isPaid=true, status="processing"),
+                 decrements stock, clears cart, busts admin stats cache
+10. Frontend ←  { order } → redirect to /orders/:id/success
+```
+
+### Test credentials
+| Type | Value |
+|------|-------|
+| Card | `4111 1111 1111 1111`, any future expiry, any CVV, OTP `1234` |
+| UPI (success) | `success@razorpay` |
+| UPI (failure) | `failure@razorpay` |
 
 ---
 
@@ -303,6 +353,8 @@ Base URL: `http://localhost:5000/api`
 | `CLOUDINARY_API_KEY` | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret |
 | `CLOUDINARY_FOLDER` | Target folder in Cloudinary |
+| `RAZORPAY_KEY_ID` | Razorpay test/live Key ID (e.g. `rzp_test_...`) |
+| `RAZORPAY_KEY_SECRET` | Razorpay Key Secret (used for signature verification) |
 
 ### Frontend (`frontend/.env`)
 | Key | Description |
@@ -324,7 +376,8 @@ Base URL: `http://localhost:5000/api`
 
 ## Roadmap
 
-- Stripe / Razorpay payment integration
+- Razorpay webhook handler (server-to-server payment confirmation as a backup to client-side verify)
+- Switch Razorpay to live mode (production keys)
 - Wishlist
 - Product search with full-text indexing
 - Pagination & sorting on product listing

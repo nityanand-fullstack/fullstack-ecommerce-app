@@ -2,7 +2,49 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useCart } from "../context/CartContext.jsx";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const CartIcon = ({ count = 0, className = "" }) => {
+  const [bump, setBump] = useState(false);
+  const prev = useRef(count);
+
+  useEffect(() => {
+    if (count > prev.current) {
+      setBump(true);
+      const t = setTimeout(() => setBump(false), 360);
+      prev.current = count;
+      return () => clearTimeout(t);
+    }
+    prev.current = count;
+  }, [count]);
+
+  return (
+    <span className={`relative inline-flex ${className}`}>
+      <svg
+        className={`h-6 w-6 ${bump ? "cart-bump" : ""}`}
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        strokeWidth={1.8}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.25 3h1.5l1.5 12h13.5l1.5-9h-15M9 19.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm9 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
+        />
+      </svg>
+      {count > 0 && (
+        <span
+          className={`absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-500 text-white text-[10px] font-bold grid place-items-center ring-2 ring-white ${
+            bump ? "cart-bump" : ""
+          }`}
+        >
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </span>
+  );
+};
 
 const navItem = ({ isActive }) =>
   `relative px-3 py-2 rounded-lg text-sm font-medium transition cursor-pointer ${
@@ -86,14 +128,6 @@ export default function Navbar() {
             <NavLink to="/products" className={navItem}>Products</NavLink>
             {isAuthenticated && (
               <>
-                <NavLink to="/cart" className={navItem}>
-                  Cart
-                  {cartCount > 0 && (
-                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand-500 text-white text-[10px] font-bold">
-                      {cartCount > 99 ? "99+" : cartCount}
-                    </span>
-                  )}
-                </NavLink>
                 <NavLink to="/orders" className={navItem}>Orders</NavLink>
                 <NavLink to="/profile" className={navItem}>Profile</NavLink>
               </>
@@ -104,6 +138,13 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-3 shrink-0">
             {isAuthenticated ? (
               <>
+                <Link
+                  to="/cart"
+                  aria-label="Cart"
+                  className="p-2 rounded-lg text-slate-600 hover:text-brand-600 hover:bg-slate-50"
+                >
+                  <CartIcon count={cartCount} />
+                </Link>
                 <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-50">
                   <div className="h-7 w-7 grid place-items-center rounded-full bg-brand-500 text-white font-semibold text-xs">
                     {(user?.name || "U").charAt(0).toUpperCase()}
@@ -129,18 +170,11 @@ export default function Navbar() {
             {isAuthenticated && (
               <Link
                 to="/cart"
-                className="relative p-2 rounded-lg text-slate-600 hover:text-brand-600 hover:bg-slate-50 cursor-pointer"
+                className="p-2 rounded-lg text-slate-600 hover:text-brand-600 hover:bg-slate-50 cursor-pointer"
                 aria-label="Cart"
                 onClick={closeMenu}
               >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 4h13M9 21a1 1 0 100-2 1 1 0 000 2zm9 0a1 1 0 100-2 1 1 0 000 2z" />
-                </svg>
-                {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-500 text-white text-[10px] font-bold grid place-items-center ring-2 ring-white">
-                    {cartCount > 99 ? "99+" : cartCount}
-                  </span>
-                )}
+                <CartIcon count={cartCount} />
               </Link>
             )}
             <button
@@ -167,13 +201,6 @@ export default function Navbar() {
             <NavLink to="/products" className={mobileNavItem} onClick={closeMenu}>Products</NavLink>
             {isAuthenticated ? (
               <>
-                <NavLink to="/cart" className={mobileNavItem} onClick={closeMenu}>
-                  Cart {cartCount > 0 && (
-                    <span className="ml-1 inline-flex items-center justify-center rounded-full bg-brand-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
-                      {cartCount}
-                    </span>
-                  )}
-                </NavLink>
                 <NavLink to="/orders" className={mobileNavItem} onClick={closeMenu}>Orders</NavLink>
                 <NavLink to="/profile" className={mobileNavItem} onClick={closeMenu}>Profile</NavLink>
                 <NavLink to="/change-password" className={mobileNavItem} onClick={closeMenu}>Change Password</NavLink>

@@ -104,16 +104,19 @@ export default function Dashboard() {
         {data ? (
           <>
             <Link
-              to="/admin/orders?status=pending"
+              to="/admin/orders?status=processing"
               className="card p-5 hover:shadow-lg transition flex items-center gap-4 cursor-pointer"
             >
-              <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-600 grid place-items-center text-xl">
-                ⏳
+              <div className="h-12 w-12 rounded-xl bg-brand-50 text-brand-600 grid place-items-center text-xl">
+                📦
               </div>
               <div className="flex-1">
-                <p className="text-sm text-slate-500">Pending orders</p>
+                <p className="text-sm text-slate-500">New orders to fulfill</p>
                 <p className="text-2xl font-bold text-slate-900">
-                  {data.totals.pendingOrders}
+                  {data.totals.newOrders}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Paid · awaiting shipment
                 </p>
               </div>
               <span className="text-slate-400">→</span>
